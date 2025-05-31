@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"golang.org/x/net/idna"
 	"gopkg.in/yaml.v3"
 )
 
@@ -46,18 +45,33 @@ func findDest(domains []DomainConfig, domain string) (string, bool) {
 	return "", false
 }
 
-func getDomain(host string) string {
-	// ポートが含まれている場合は除去
-	if idx := strings.Index(host, ":"); idx != -1 {
-		host = host[:idx]
+func getDomain(data []byte) string {
+	endBits := []byte{0x63, 0xdd, 0x02}
+	domainStartIndex := 0
+	domainEndIndex := len(data)
+
+	// endBitsの位置を探す
+	for end := len(data) - len(endBits); end >= 0; end-- {
+		if len(data) >= end+len(endBits) && string(data[end:end+len(endBits)]) == string(endBits) {
+			domainEndIndex = end - 1
+			break
+		}
 	}
-	// Convert Unicode domain names to ASCII-compatible encoding (ACE)
-	asciiHost, err := idna.ToASCII(host)
-	if err != nil {
-		log.Printf("IDNA conversion error: %v\n", err)
-		return host
+
+	// ドメイン名の開始位置を探す
+	for start := domainEndIndex; start >= 0; start-- {
+		c := data[start]
+		if ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9') || c == '-' || c == '.' {
+			domainStartIndex = start
+		} else {
+			break
+		}
 	}
-	return asciiHost
+
+	if domainStartIndex < domainEndIndex && domainEndIndex < len(data) && domainStartIndex >= 0 {
+		return string(data[domainStartIndex : domainEndIndex+1])
+	}
+	return ""
 }
 
 func handleConn(client net.Conn, cfg *Config) {
@@ -71,43 +85,13 @@ func handleConn(client net.Conn, cfg *Config) {
 	}
 
 	data := buf[:n]
-	host := ""
-
-	endBits := []byte{0x63, 0xdd, 0x02}
-	domainStartIndex := 0
-	domainEndIndex := n
-
-	for end := n - len(endBits); end >= 0; end-- {
-		if len(data) >= end+len(endBits) && string(data[end:end+len(endBits)]) == string(endBits) {
-			// log.Printf("Found end bits at index %d | bin: %08b | hex: %02x | ascii: %q\n", end, data[end], data[end], data[end])
-			domainEndIndex = end - 1
-			break
-		}
-	}
-
-	for start := domainEndIndex; start >= 0 && start < n; start-- {
-		c := data[start]
-		// fmt.Printf("Checking character: %d (as string: %q) at index %d (is 0x15: %t)\n", c, string(c), start, c == byte(0x13))
-		// ドメイン名に使えないASCII文字かどうかをチェック
-		if ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9') || c == '-' || c == '.' {
-			domainStartIndex = start
-		} else {
-			break
-		}
-	}
-	// 範囲外アクセス防止
-	if domainStartIndex < domainEndIndex && domainEndIndex < len(data) && domainStartIndex >= 0 {
-		host = string(data[domainStartIndex : domainEndIndex+1])
-	} else {
-		host = ""
-	}
-	if host == "" {
+	domain := getDomain(data)
+	if domain == "" {
 		log.Println("failed to extract host")
 		return
 	}
-	fmt.Printf("client ip: %s, client port: %s, host: %s\n", client.RemoteAddr().(*net.TCPAddr).IP.String(), fmt.Sprintf("%d", client.RemoteAddr().(*net.TCPAddr).Port), host)
+	fmt.Printf("client ip: %s, client port: %s, host: %s\n", client.RemoteAddr().(*net.TCPAddr).IP.String(), fmt.Sprintf("%d", client.RemoteAddr().(*net.TCPAddr).Port), domain)
 
-	domain := getDomain(host)
 	dest, ok := findDest(cfg.Domains, domain)
 	if !ok {
 		log.Printf("unknown domain: %s\n", domain)
