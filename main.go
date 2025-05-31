@@ -50,7 +50,6 @@ func getDomain(data []byte) string {
 	domainStartIndex := 0
 	domainEndIndex := len(data)
 
-	// endBitsの位置を探す
 	for end := len(data) - len(endBits); end >= 0; end-- {
 		if len(data) >= end+len(endBits) && string(data[end:end+len(endBits)]) == string(endBits) {
 			domainEndIndex = end - 1
@@ -58,7 +57,6 @@ func getDomain(data []byte) string {
 		}
 	}
 
-	// ドメイン名の開始位置を探す
 	for start := domainEndIndex; start >= 0; start-- {
 		c := data[start]
 		if ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9') || c == '-' || c == '.' {
