@@ -1,0 +1,8 @@
+listen: ":25565"
+domains:
+  - domain: "sample0.test.com"
+    ip: "192.168.1.10"
+    port: 25565
+  - domain: "sample1.test.com"
+    ip: "192.168.1.11"
+    port: 25566
