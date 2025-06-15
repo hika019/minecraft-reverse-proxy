@@ -114,7 +114,7 @@ func handleConn(client net.Conn, cfg *Config) {
 		log.Println("failed to extract host")
 		return
 	}
-	fmt.Printf("client ip: %s, client port: %s, host: %s\n", client.RemoteAddr().(*net.TCPAddr).IP.String(), fmt.Sprintf("%d", client.RemoteAddr().(*net.TCPAddr).Port), domain)
+	log.Printf("client ip: %s, client port: %s, host: %s\n", client.RemoteAddr().(*net.TCPAddr).IP.String(), fmt.Sprintf("%d", client.RemoteAddr().(*net.TCPAddr).Port), domain)
 
 	dest, domainCfg, ok := findDest(cfg.Domains, domain)
 	if !ok {
