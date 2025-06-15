@@ -6,20 +6,38 @@ import (
 	"log"
 	"net"
 	"os"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 type DomainConfig struct {
-	Domain string `yaml:"domain"`
-	IP     string `yaml:"ip"`
-	Port   int    `yaml:"port"`
+	Domain     string   `yaml:"domain"`
+	IP         string   `yaml:"ip"`
+	Port       int      `yaml:"port"`
+	AllowedIPs []string `yaml:"allowed_ips,omitempty"` // ドメインごとのアクセス制限
 }
 
 type Config struct {
-	Listen  string         `yaml:"listen"`
-	Domains []DomainConfig `yaml:"domains"`
+	Listen     string         `yaml:"listen"`
+	Domains    []DomainConfig `yaml:"domains"`
+	AllowedIPs []string       `yaml:"allowed_ips,omitempty"` // 全体のアクセス制限
+}
+
+// アクセス制限チェック
+func isAllowedIP(allowed []string, remoteAddr string) bool {
+	if len(allowed) == 0 {
+		return true // 制限なし
+	}
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		return false
+	}
+	for _, ip := range allowed {
+		if host == ip {
+			return true
+		}
+	}
+	return false
 }
 
 func loadConfig(path string) (*Config, error) {
@@ -36,13 +54,13 @@ func loadConfig(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-func findDest(domains []DomainConfig, domain string) (string, bool) {
+func findDest(domains []DomainConfig, domain string) (string, *DomainConfig, bool) {
 	for _, d := range domains {
-		if strings.EqualFold(d.Domain, domain) {
-			return fmt.Sprintf("%s:%d", d.IP, d.Port), true
+		if d.Domain == domain {
+			return fmt.Sprintf("%s:%d", d.IP, d.Port), &d, true
 		}
 	}
-	return "", false
+	return "", nil, false
 }
 
 func getDomain(data []byte) string {
@@ -75,6 +93,14 @@ func getDomain(data []byte) string {
 func handleConn(client net.Conn, cfg *Config) {
 	defer client.Close()
 
+	clientAddr := client.RemoteAddr().String()
+	if !isAllowedIP(cfg.AllowedIPs, clientAddr) {
+		log.Printf("access denied (global): %s\n", clientAddr)
+		return
+	}
+	log.Printf("connected: %s\n", clientAddr)
+	defer log.Printf("disconnected: %s\n", clientAddr)
+
 	buf := make([]byte, 512)
 	n, err := client.Read(buf)
 	if err != nil {
@@ -90,9 +116,14 @@ func handleConn(client net.Conn, cfg *Config) {
 	}
 	fmt.Printf("client ip: %s, client port: %s, host: %s\n", client.RemoteAddr().(*net.TCPAddr).IP.String(), fmt.Sprintf("%d", client.RemoteAddr().(*net.TCPAddr).Port), domain)
 
-	dest, ok := findDest(cfg.Domains, domain)
+	dest, domainCfg, ok := findDest(cfg.Domains, domain)
 	if !ok {
 		log.Printf("unknown domain: %s\n", domain)
+		return
+	}
+	// ドメインごとのアクセス制限
+	if !isAllowedIP(domainCfg.AllowedIPs, clientAddr) {
+		log.Printf("access denied (domain): %s for %s\n", clientAddr, domain)
 		return
 	}
 
