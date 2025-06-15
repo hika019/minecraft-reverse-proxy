@@ -10,7 +10,7 @@ Minecraft Reverse Proxy is a TCP reverse proxy that receives connection requests
 ### 1. Build or Run
 
 ```sh
-go run main.go
+go run .
 # or
 go build -o mc-reverse-proxy
 ./mc-reverse-proxy
@@ -21,16 +21,25 @@ go build -o mc-reverse-proxy
 ```yaml
 listen: ":25565"
 domains:
-    - domain: hogehoge.example.com
-        ip: 192.168.1.10
-        port: 25565
-    - domain: fugafuga.example.com
-        ip: 192.168.1.11
-        port: 25565
+  - domain: "sample0.test.com"
+    ip: "192.168.1.10"
+    port: 25565
+    allowed_ips:   # Allowed IPs for this domain (optional)
+      - "127.0.0.1"
+      - "192.168.1.100"
+  - domain: "sample1.test.com"
+    ip: "192.168.1.11"
+    port: 25566
+    # If allowed_ips is omitted, all IPs are allowed
+
+allowed_ips: # Allowed IPs for the entire proxy (optional)
+  - "127.0.0.1"
+  - "192.168.1.200"
 ```
 
 - `listen`: Address and port the proxy listens on
-- `domains`: List of destination domains, IPs, and ports
+- `domains`: List of destination domains, IPs, ports, and (optionally) allowed IPs for each domain
+- `allowed_ips`: List of allowed IPs for the entire proxy (optional, if omitted or empty, all IPs are allowed)
 
 ### 3. Start the Server
 
@@ -52,7 +61,7 @@ Minecraft Reverse Proxyは、Minecraftサーバーへの接続要求を受け取
 ### 1. ビルドまたは実行
 
 ```sh
-go run main.go
+go run .
 # または
 go build -o mc-reverse-proxy
 ./mc-reverse-proxy
@@ -63,16 +72,25 @@ go build -o mc-reverse-proxy
 ```yaml
 listen: ":25565"
 domains:
-    - domain: hogehoge.example.com
-        ip: 192.168.1.10
-        port: 25565
-    - domain: fugafuga.example.com
-        ip: 192.168.1.11
-        port: 25565
+  - domain: "sample0.test.com"
+    ip: "192.168.1.10"
+    port: 25565
+    allowed_ips:   # このドメインへのアクセス許可IP（省略可）
+      - "127.0.0.1"
+      - "192.168.1.100"
+  - domain: "sample1.test.com"
+    ip: "192.168.1.11"
+    port: 25566
+    # allowed_ips: を省略すると全許可
+
+allowed_ips: # 全体のアクセス許可IP（省略可）
+  - "127.0.0.1"
+  - "192.168.1.200"
 ```
 
 - `listen`: プロキシが待ち受けるアドレスとポート
-- `domains`: 転送先のドメイン・IP・ポートのリスト
+- `domains`: 転送先のドメイン・IP・ポート・（任意で）アクセス許可IPリスト
+- `allowed_ips`: プロキシ全体へのアクセス許可IPリスト（省略可、空なら全許可）
 
 ### 3. サーバーの起動
 
